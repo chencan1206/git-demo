@@ -9,7 +9,31 @@
 - 工程存储：Zarr v2（立方体）+ SQLite/WAL（运行与产物元数据）+ JSON（项目元信息）
 - 界面：PySide6 桌面应用，支持 2D 假彩色、像元光谱联动、分割 / 预处理 / 建模 / DC²Net 面板
 
----
+> 完整操作说明见 [用户手册](docs/user-guide.md)。
+
+**版本 1.0.0**
+
+## 0. 双击即用（免安装）
+
+发行版产物由 `scripts/package_release.py` 生成，无需 Python 环境：
+
+| 平台 | 产物 | 使用方式 |
+|---|---|---|
+| Windows | `PHS-Studio-1.0.0-windows-installer.exe` | 双击安装，开始菜单 / 桌面启动 |
+| Windows | `PHS-Studio-1.0.0-windows-x64.exe` | 免安装绿色版，双击直接运行 |
+| macOS | `PHS-Studio-1.0.0-macos-*.dmg` | 打开后拖入 Applications |
+| Linux | `PHS-Studio-1.0.0-linux-x86_64.tar.gz` | 解压后双击 `PHS-Studio`（或 `./PHS-Studio`） |
+
+```bash
+# 在当前平台构建（需要已安装依赖）
+python scripts/package_release.py
+
+# 三平台自动构建：推一个 tag 即可，GitHub Actions 会产出全部安装包
+git tag v1.0.0 && git push origin v1.0.0
+```
+
+工作流见 `.github/workflows/build-installers.yml`，图标由 `packaging/make_icon.py` 生成，
+Windows 安装器脚本为 `packaging/windows-installer.iss`。
 
 ## 1. 干净机器安装
 
@@ -28,12 +52,12 @@ python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -U pip
 
-# 3) 安装（含 IO / 传统 ML / PyTorch / 开发工具）
-pip install -e ".[io,ml,dl,dev]"
+# 3) 安装（运行时依赖；需要深度学习/测试时追加 ,dl / ,dev）
+pip install -e ".[dev]"
 ```
 
-> 不需要深度学习时可用 `pip install -e ".[io,ml]"`；`dl` 额外会装 CPU 版之外的
-> PyTorch 需要按官方源安装，本仓库只在 CPU 上做过验收。
+> 不安装 `dl` 时软件可正常使用传统建模；`pip install -e ".[dl]"` 会从 PyPI 拉取
+> PyTorch，CPU 环境建议改用官方 CPU 源。本仓库只在 CPU 上做过验收。
 
 ### 验证安装
 
@@ -53,6 +77,17 @@ phs                     # 或 python -m plant_hsi
 
 无显示器 / CI 环境请设置 `QT_QPA_PLATFORM=offscreen`，程序会进入 headless 模式并正常退出。
 
+### 构建与安装 wheel
+
+```bash
+python -m pip install build
+python -m build                      # 输出 dist/*.whl 与 *.tar.gz
+pip install dist/plant_hsi_studio-1.0.0-py3-none-any.whl
+```
+
+wheel 的运行时依赖已包含在 `dependencies` 中；只有 PyTorch 是可选的 `dl` extra。
+离线分发时可先 `pip download` 依赖，或使用内部镜像。
+
 ---
 
 ## 2. 第一次使用（冒烟路径）
@@ -68,6 +103,15 @@ phs                     # 或 python -m plant_hsi
 6. **Model → Build HTML Report** 生成项目报告；模型、指标、报告均登记在 `runs/` 与
    `artifacts/` 下，可在资源树中追溯。
 7. 深度学习：绑定 CUBE 后构建图块集、训练 DC²Net、滑窗推理、波长重要性。
+
+### 没有真实数据？先生成演示项目
+
+```bash
+python scripts/make_demo_project.py --out /workspace/phs_demo --force
+```
+
+脚本会生成 4 个合成立方体、8 个 ROI 和一份 `demo_report.html`，用
+**File → Open Project** 打开 `/workspace/phs_demo/demo-project` 即可体验完整流程。
 
 ---
 
@@ -118,8 +162,8 @@ plant-hsi-studio/
 │  ├─ export/        GeoTIFF / CSV
 │  └─ ui/            主窗口与各分析面板
 ├─ tests/unit/       pytest 单元测试与 UI 冒烟
-├─ scripts/          大文件基准、截图、Stage 6 验收
-└─ docs/             设计文档（位于 /workspace/docs/design）
+├─ scripts/          安装脚本、演示项目、大文件基准、验收脚本
+└─ docs/             用户手册（设计文档位于 /workspace/docs/design）
 ```
 
 ## 5. 已知限制

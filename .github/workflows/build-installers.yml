@@ -1,0 +1,84 @@
+name: build-installers
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            artifact: windows
+          - os: macos-latest
+            artifact: macos
+          - os: ubuntu-latest
+            artifact: linux
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install -U pip
+          python -m pip install . pyinstaller pillow
+
+      - name: Generate icons
+        run: python packaging/make_icon.py
+
+      - name: Convert icon for macOS
+        if: matrix.os == 'macos-latest'
+        run: |
+          mkdir -p packaging/icon.iconset
+          for s in 16 32 64 128 256 512; do
+            sips -z $s $s packaging/icon_512.png --out packaging/icon.iconset/icon_${s}x${s}.png
+          done
+          iconutil -c icns packaging/icon.iconset -o packaging/icon.icns
+
+      - name: Build release artifact
+        run: python scripts/package_release.py
+
+      - name: Build Windows installer (Inno Setup)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (Test-Path $iscc) {
+            & $iscc "packaging\windows-installer.iss"
+          } else {
+            Write-Warning "Inno Setup not found; shipping the portable exe only."
+          }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: phs-studio-${{ matrix.artifact }}
+          path: |
+            dist/PHS-Studio-*
+          if-no-files-found: error
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          generate_release_notes: true

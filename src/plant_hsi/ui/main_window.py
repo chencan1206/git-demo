@@ -27,6 +27,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from plant_hsi import __version__
 from plant_hsi.core.artifact import ArtifactKind, ArtifactRef
 from plant_hsi.core.project import Project, ProjectError
 from plant_hsi.ui.hsi_view import HsiImageView
@@ -111,7 +112,7 @@ class MainWindow(QMainWindow):
         m_help = mb.addMenu("&Help")
         a_about = QAction("&About", self)
         a_about.triggered.connect(
-            lambda: QMessageBox.information(self, "About", "PHS Studio 0.1.0")
+            lambda: QMessageBox.information(self, "About", f"PHS Studio {__version__}")
         )
         m_help.addAction(a_about)
 

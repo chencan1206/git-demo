@@ -23,6 +23,7 @@ Thumbs.db
 .phs_proj/
 *.phs_proj
 .venv/
+.venv-pack/
 .env
 
 # Config / logs

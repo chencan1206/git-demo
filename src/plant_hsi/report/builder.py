@@ -15,6 +15,8 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from plant_hsi import __version__
+
 _CSS = """
 :root {
   --ink: #1b2430;
@@ -440,7 +442,7 @@ def build_report(
     <p class="note">所有指标由 PHS Studio 自动计算；固定数据 + 参数 + 种子可复现。</p>
   </section>
 </main>
-<footer>PlantHSI Studio · v0.1.0 · report generated {_esc(generated)}</footer>
+<footer>PlantHSI Studio · v{_esc(__version__)} · report generated {_esc(generated)}</footer>
 </body>
 </html>
 """
