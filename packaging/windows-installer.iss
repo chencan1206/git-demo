@@ -3,7 +3,9 @@
 ; Build:    "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" packaging\windows-installer.iss
 
 #define AppName "PHS Studio"
-#define AppVersion "1.0.0"
+#ifndef AppVersion
+  #define AppVersion "1.0.0"
+#endif
 #define AppPublisher "PHS Team"
 #define AppExe "PHS-Studio.exe"
 

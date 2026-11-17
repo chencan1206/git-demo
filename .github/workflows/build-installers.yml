@@ -71,8 +71,9 @@ jobs:
         shell: pwsh
         run: |
           $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          $ver = (Select-String -Path pyproject.toml -Pattern '^version = "(.+)"').Matches[0].Groups[1].Value
           if (Test-Path $iscc) {
-            & $iscc "packaging\windows-installer.iss"
+            & $iscc "/DAppVersion=$ver" "packaging\windows-installer.iss"
           } else {
             Write-Warning "Inno Setup not found; shipping the portable exe only."
           }
