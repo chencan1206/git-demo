@@ -16,6 +16,29 @@ def main() -> int:
     log = setup_logging(Path.home() / ".config" / "plant_hsi" / "logs", level=cfg.log_level)
     log.info("PHS Studio starting v%s", __version__)
 
+    # End-to-end pipeline check: pure computation, no Qt involved, so it can
+    # run even when the GUI cannot start (headless servers, broken Qt plugins).
+    if "--e2e" in sys.argv:
+        import json
+
+        from plant_hsi import selftest  # noqa: WPS433
+
+        payload: dict[str, object] = {"ok": False}
+        try:
+            payload.update(selftest.run())
+            payload["ok"] = True
+            print("e2e OK samples={samples} report_bytes={report_bytes}".format(**payload))
+        except Exception as exc:  # noqa: BLE001 — surface the real cause
+            import traceback
+
+            traceback.print_exc()
+            payload["error"] = f"{type(exc).__name__}: {exc}"
+            print(f"e2e FAILED: {payload['error']}")
+        out = os.environ.get("PHS_E2E_OUT")
+        if out:
+            Path(out).write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+        return 0 if payload["ok"] else 1
+
     # Headless check: if Qt is not installed, exit gracefully.
     try:
         from PySide6.QtWidgets import QApplication  # noqa: WPS433 — optional dep

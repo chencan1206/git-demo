@@ -64,7 +64,7 @@ jobs:
         run: python scripts/package_release.py
 
       - name: Smoke test frozen app (GUI must construct and exit cleanly)
-        run: python scripts/smoke_test.py
+        run: python scripts/smoke_test.py --e2e
 
       - name: Build Windows installer (Inno Setup)
         if: matrix.os == 'windows-latest'
