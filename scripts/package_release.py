@@ -31,7 +31,7 @@ VERSION = "1.0.0"
 
 
 def run(cmd: list[str]) -> None:
-    print("→", " ".join(cmd))
+    print(">>", " ".join(cmd))
     subprocess.run(cmd, cwd=ROOT, check=True)
 
 
@@ -164,7 +164,7 @@ def main() -> int:
         artifact = package_linux(built)
 
     size = artifact.stat().st_size / 1024 / 1024
-    print(f"\n✅ {artifact.name}  ({size:.1f} MB)")
+    print(f"\nOK  {artifact.name}  ({size:.1f} MB)")
     print(f"   sha256: {sha256(artifact)}")
     return 0
 
