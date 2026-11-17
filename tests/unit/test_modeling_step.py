@@ -98,6 +98,9 @@ def test_seed_is_part_of_the_cache_key(trained) -> None:
     prj, art, model, params = trained
     again = prj.run_step("ml.train", [art], params=params, seed=42)
     assert again.skipped is True
+    # A cache hit must hand the callers back the original artifacts instead of
+    # an empty list, otherwise GUI panels crash on result.outputs[0].
+    assert again.outputs and again.outputs[0].id == model.id
     cached = prj.find_cached_outputs("ml.train", [art], params=params, seed=42)
     assert cached and cached[0].id == model.id
 

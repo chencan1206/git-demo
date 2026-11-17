@@ -312,7 +312,7 @@ def test_import_dataset_step_creates_artifacts_and_hits_cache(tmp_path: Path) ->
         second = prj.run_step("io.import_dataset", [raw], params=params)
         assert second.ok
         assert second.skipped
-        assert second.outputs == []
+        assert [art.id for art in second.outputs] == [output.id]
         cached = prj.find_cached_outputs("io.import_dataset", [raw], params=params)
         assert [art.id for art in cached] == [output.id]
         cubes = [art for art in prj.list_artifacts() if art.kind == ArtifactKind.CUBE]

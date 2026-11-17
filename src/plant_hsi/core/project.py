@@ -231,7 +231,30 @@ class Project:
             run.output_artifacts = ids
             self.db.upsert_run(_row(run))
         elif result.skipped:
-            log.info("run %s skipped (cache hit): %s", run.id, step_name)
+            # Cache hit: Step.run() short-circuits and returns no outputs, but
+            # callers (GUI panels especially) still need the artifacts. Recover
+            # them from the earlier successful run with the same inputs/params.
+            # Step.run() normalises seed=None to 0, so match on that value to
+            # avoid picking up an unseeded run that used a different seed.
+            restored = self.find_cached_outputs(
+                step_name, inputs, params, 0 if seed is None else seed
+            )
+            if restored:
+                result.outputs = restored
+                run.output_artifacts = [a.id for a in restored]
+                self.db.upsert_run(_row(run))
+                log.info(
+                    "run %s skipped (cache hit): %s -> %d cached outputs",
+                    run.id,
+                    step_name,
+                    len(restored),
+                )
+            else:
+                log.warning(
+                    "run %s skipped (cache hit): %s but no matching outputs found",
+                    run.id,
+                    step_name,
+                )
         else:
             log.error("run %s failed: %s", run.id, result.run.error)
         return result
