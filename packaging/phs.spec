@@ -99,8 +99,8 @@ if IS_MAC:
         info_plist={
             "CFBundleName": "PHS Studio",
             "CFBundleDisplayName": "PHS Studio",
-            "CFBundleShortVersionString": "1.0.0",
-            "CFBundleVersion": "1.0.0",
+            "CFBundleShortVersionString": "1.0.1",
+            "CFBundleVersion": "1.0.1",
             "NSHighResolutionCapable": True,
             "LSMinimumSystemVersion": "11.0",
         },

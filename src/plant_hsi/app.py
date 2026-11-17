@@ -24,9 +24,16 @@ def main() -> int:
         print(f"PHS v{__version__} (headless) — install PySide6 to launch the GUI.")
         return 0
 
-    # If DISPLAY is missing but Qt is present, switch to offscreen platform so
-    # the app loads without crashing (useful for CI and smoke tests).
-    _headless_platform = not os.environ.get("DISPLAY")
+    # Headless fallback: only Linux has DISPLAY/WAYLAND_DISPLAY. Windows and
+    # macOS never set them, so testing them here would make the frozen app
+    # construct the window and quit immediately (looks like a silent crash).
+    _linux = sys.platform.startswith("linux")
+    _self_test = "--self-test" in sys.argv
+    _headless_platform = _self_test or (
+        _linux
+        and not os.environ.get("DISPLAY")
+        and not os.environ.get("WAYLAND_DISPLAY")
+    )
     if _headless_platform and not os.environ.get("QT_QPA_PLATFORM"):
         os.environ["QT_QPA_PLATFORM"] = "offscreen"
 
@@ -36,13 +43,33 @@ def main() -> int:
 
     from plant_hsi.ui.main_window import MainWindow  # noqa: WPS433
 
-    window = MainWindow()
-    window.show()
+    try:
+        window = MainWindow()
+        window.show()
+    except Exception as exc:  # noqa: BLE001 — surface startup failures, never die silently
+        import traceback
+
+        log.exception("startup failed")
+        crash_log = Path.home() / ".config" / "plant_hsi" / "crash.log"
+        crash_log.parent.mkdir(parents=True, exist_ok=True)
+        crash_log.write_text(traceback.format_exc(), encoding="utf-8")
+        try:
+            from PySide6.QtWidgets import QMessageBox
+
+            QMessageBox.critical(
+                None,
+                "PHS Studio 启动失败",
+                f"{type(exc).__name__}: {exc}\n\n详细堆栈已写入:\n{crash_log}",
+            )
+        except Exception:  # noqa: BLE001 — dialog is best effort
+            pass
+        return 1
 
     # Offscreen mode (no real display) → quit immediately after construction
     # so the process can be used as a smoke test.
     if _headless_platform:
         log.info("offscreen mode — MainWindow instantiated, quitting cleanly")
+        print(f"PHS Studio v{__version__} self-test OK (offscreen)")
         window.close()
         app.quit()
         return 0
