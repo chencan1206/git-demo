@@ -33,7 +33,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install -U pip
-          python -m pip install . pyinstaller pillow
+          python -m pip install . pyinstaller pillow PySide6
 
       - name: Generate icons
         run: python packaging/make_icon.py
