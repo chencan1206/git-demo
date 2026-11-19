@@ -12,13 +12,15 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QPoint, QRect, Qt
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import (
+    QApplication,
     QDockWidget,
     QFileDialog,
     QMainWindow,
     QMessageBox,
+    QScreen,
     QStatusBar,
     QTabWidget,
     QTreeWidget,
@@ -37,19 +39,68 @@ from plant_hsi.ui.segment_panel import SegmentPanel
 
 
 class MainWindow(QMainWindow):
+    # Hard caps — never open a window larger than these, even on a 4K screen.
+    _MAX_W = 1400
+    _MAX_H = 900
+    # Floor — smaller screens will get an 85 % clip of the usable area so that
+    # the user can still drag/maximise manually, and tiny 1024×640 panels at
+    # least keep all dock widgets accessible.
+    _MIN_W = 1024
+    _MIN_H = 640
+
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("PHS Studio — plant-hsi-studio")
-        self.resize(1400, 900)
         self._project: Project | None = None
         self._open_views: dict[str, HsiImageView] = {}  # artifact.id → view
         self._view_wl: dict[str, list[float] | None] = {}  # artifact.id → wavelengths
+
+        self._apply_initial_geometry()
 
         self._build_menu()
         self._build_central()
         self._build_segment_dock()
         self.setStatusBar(QStatusBar())
         self._refresh_resource_tree()
+
+    # ------------------------------------------------------------------ UI
+    def _apply_initial_geometry(self) -> None:
+        """Pick a sensible starting size that fits on the current screen.
+
+        ``resize(1400, 900)`` used to be hard-coded, which spilled out past the
+        right/bottom edge on 1366×768 laptops and left users with a window they
+        couldn't drag back — exactly the complaint we got.
+        """
+        screen: QScreen | None = self.screen()
+        if screen is None:
+            # ``self.screen()`` only returns a real screen after show(); before
+            # that fall back to the primary screen via the app instance.
+            app = QApplication.instance()
+            screen = app.primaryScreen() if app else None
+        if screen is None:
+            self.resize(self._MAX_W, self._MAX_H)
+            return
+
+        avail = screen.availableGeometry()  # excludes taskbar / dock
+        w = min(int(avail.width() * 0.92), self._MAX_W)
+        h = min(int(avail.height() * 0.92), self._MAX_H)
+        w = max(w, self._MIN_W)
+        h = max(h, self._MIN_H)
+
+        self.resize(w, h)
+        # Centre the window on the usable area so nothing falls off the edge.
+        self.move(
+            QPoint(
+                avail.x() + (avail.width() - w) // 2,
+                avail.y() + (avail.height() - h) // 2,
+            )
+        )
+        # If the geometry is still larger than the available rectangle
+        # (e.g. an ultra-small secondary monitor), clamp to the screen.
+        if (w, h) > (avail.width(), avail.height()):
+            self.setGeometry(avail)  # type: ignore[arg-type]
+
+        self.setMinimumSize(self._MIN_W, self._MIN_H)
 
     # ------------------------------------------------------------------ UI
     def _build_menu(self) -> None:
@@ -109,6 +160,11 @@ class MainWindow(QMainWindow):
         a_open_report.triggered.connect(lambda: self.model_panel.btn_open_report.click())
         m_model.addAction(a_open_report)
 
+        # View 菜单 —— 关键：把所有 dock 面板的 toggleAction 挂进来，
+        # 用户一旦点了面板上的关闭按钮，还能从这里点一下把它再打开。
+        self.m_view = mb.addMenu("&View")
+        self._dock_actions: dict[str, QAction] = {}
+
         m_help = mb.addMenu("&Help")
         a_about = QAction("&About", self)
         a_about.triggered.connect(
@@ -133,6 +189,18 @@ class MainWindow(QMainWindow):
         self.tabs.currentChanged.connect(self._on_tab_changed)
         layout.addWidget(self.tabs, stretch=2)
 
+    def _register_dock(self, dock: QDockWidget, key: str) -> None:
+        """挂到 View 菜单 + 记住它的切换动作。
+
+        QDockWidget.toggleViewAction() 是 Qt 自带的、自动在
+        显示/隐藏之间切换的 QAction——把它挂到菜单里，用户点菜单就等价于
+        点一下 dock 自己的关闭按钮（再点一次就再打开）。
+        """
+        action = dock.toggleViewAction()
+        action.setText(dock.windowTitle())
+        self.m_view.addAction(action)
+        self._dock_actions[key] = action
+
     def _build_segment_dock(self) -> None:
         self.seg_panel = SegmentPanel(self)
         self.seg_panel.artifacts_created.connect(self._refresh_resource_tree)
@@ -140,8 +208,9 @@ class MainWindow(QMainWindow):
         dock = QDockWidget("分割 / Segmentation", self)
         dock.setObjectName("segmentation_dock")
         dock.setWidget(self.seg_panel)
-        dock.setMinimumWidth(400)
+        dock.setMinimumWidth(280)
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dock)
+        self._register_dock(dock, "segment")
         self.seg_dock = dock
 
         self.preprocess_panel = PreprocessPanel(self)
@@ -150,8 +219,9 @@ class MainWindow(QMainWindow):
         dock2 = QDockWidget("光谱预处理 / Preprocessing", self)
         dock2.setObjectName("preprocess_dock")
         dock2.setWidget(self.preprocess_panel)
-        dock2.setMinimumWidth(400)
+        dock2.setMinimumWidth(280)
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dock2)
+        self._register_dock(dock2, "preprocess")
         self.preprocess_dock = dock2
 
         self.model_panel = ModelingPanel(self)
@@ -160,8 +230,9 @@ class MainWindow(QMainWindow):
         dock3 = QDockWidget("建模与报告 / Modeling", self)
         dock3.setObjectName("modeling_dock")
         dock3.setWidget(self.model_panel)
-        dock3.setMinimumWidth(400)
+        dock3.setMinimumWidth(280)
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dock3)
+        self._register_dock(dock3, "model")
         self.model_dock = dock3
 
         self.dl_panel: Any = None
@@ -176,8 +247,9 @@ class MainWindow(QMainWindow):
             dock4 = QDockWidget("深度学习 / DC²Net", self)
             dock4.setObjectName("dl_dock")
             dock4.setWidget(self.dl_panel)
-            dock4.setMinimumWidth(400)
+            dock4.setMinimumWidth(280)
             self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dock4)
+            self._register_dock(dock4, "dl")
             self.dl_dock = dock4
 
     def _on_spectra_ready(self, spectra: object, wavelength: object) -> None:

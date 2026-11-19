@@ -60,6 +60,21 @@ def main() -> int:
     if _headless_platform and not os.environ.get("QT_QPA_PLATFORM"):
         os.environ["QT_QPA_PLATFORM"] = "offscreen"
 
+    # --- High-DPI / display scaling ------------------------------------
+    # Qt 6.5+ respects these env vars *before* QApplication construction. They
+    # tell Qt to honour the OS-level DPI scale (Windows 125%/150%, macOS HiDPI)
+    # and to use screen-independent (device-pixel) coordinates for geometry.
+    os.environ.setdefault("QT_ENABLE_HIGHDPI_SCALING", "1")
+    os.environ.setdefault("QT_AUTO_SCREEN_SCALE_FACTOR", "1")
+    # Qt 5 fallback flags — harmless on Qt 6.
+    try:
+        from PySide6.QtCore import Qt  # noqa: WPS433
+
+        QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)  # type: ignore[attr-defined]
+        QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)  # type: ignore[attr-defined]
+    except Exception:  # noqa: BLE001 — Qt 6 removed these, that's fine
+        pass
+
     app = QApplication(sys.argv)
     app.setApplicationName("PHS Studio")
     app.setOrganizationName("PHS")
