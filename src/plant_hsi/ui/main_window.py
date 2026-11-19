@@ -13,14 +13,13 @@ from typing import Any
 
 import numpy as np
 from PySide6.QtCore import QPoint, QRect, Qt
-from PySide6.QtGui import QAction, QKeySequence
+from PySide6.QtGui import QAction, QKeySequence, QScreen
 from PySide6.QtWidgets import (
     QApplication,
     QDockWidget,
     QFileDialog,
     QMainWindow,
     QMessageBox,
-    QScreen,
     QStatusBar,
     QTabWidget,
     QTreeWidget,
